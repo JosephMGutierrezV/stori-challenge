@@ -1,0 +1,15 @@
+# Archivos y carpetas de Go
+bin/
+vendor/
+*.exe
+*.test
+*.out
+
+# Archivos de configuración y logs
+*.env
+*.log
+
+# Archivos del sistema y editor
+.DS_Store
+.idea/
+.vscode/
