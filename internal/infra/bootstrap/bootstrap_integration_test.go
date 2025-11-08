@@ -42,7 +42,7 @@ func TestInitializeApp_WithPostgresAndLocalstack(t *testing.T) {
 	if appCtx == nil {
 		t.Fatalf("InitializeApp returned nil AppContext")
 	}
-	if appCtx.SummaryService == nil {
+	if appCtx.SummaryUseCase == nil {
 		t.Fatalf("SummaryService is nil in AppContext")
 	}
 }

@@ -21,6 +21,7 @@ type Config struct {
 	EmailDefault   string `mapstructure:"EMAIL_DEFAULT"`
 	AWSEndpointURL string `mapstructure:"AWS_ENDPOINT_URL"`
 	UsePathStyle   bool   `mapstructure:"AWS_S3_USE_PATH_STYLE"`
+	StoriLogoURL   string `mapstructure:"STORI_LOGO_URL"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -28,6 +29,7 @@ func LoadConfig() (*Config, error) {
 	viper.SetDefault("DB_SCHEMA", "public")
 	viper.SetDefault("EMAIL_DEFAULT", "josephmauricio23@hotmail.com")
 	viper.SetDefault("AWS_S3_USE_PATH_STYLE", false)
+	viper.SetDefault("STORI_LOGO_URL", "https://media.licdn.com/dms/image/v2/D4E0BAQHuxJutLmsBFQ/company-logo_200_200/company-logo_200_200/0/1700583469952?e=1764201600&v=beta&t=yAwe1j0mbzSEM19MZSGWYt1RWiD9l7rPcgjSxGZSp_Q")
 
 	for _, k := range []string{
 		"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD",
@@ -35,6 +37,7 @@ func LoadConfig() (*Config, error) {
 		"S3_BUCKET_NAME", "S3_REGION",
 		"SES_FROM", "EMAIL_DEFAULT",
 		"AWS_ENDPOINT_URL", "AWS_S3_USE_PATH_STYLE",
+		"STORI_LOGO_URL",
 	} {
 		_ = viper.BindEnv(k)
 	}
@@ -53,7 +56,6 @@ func LoadConfig() (*Config, error) {
 		return nil, fmt.Errorf("unmarshal config: %w", err)
 	}
 
-	// Validar requeridos (los mismos de antes)
 	missing := []string{}
 	req := func(k, v string) {
 		if strings.TrimSpace(v) == "" {
@@ -69,6 +71,7 @@ func LoadConfig() (*Config, error) {
 	req("S3_REGION", cfg.S3Region)
 	req("SES_FROM", cfg.SESFrom)
 	req("EMAIL_DEFAULT", cfg.EmailDefault)
+	req("STORI_LOGO_URL", cfg.StoriLogoURL)
 
 	if len(missing) > 0 {
 		return nil, fmt.Errorf("faltan variables: %v", missing)

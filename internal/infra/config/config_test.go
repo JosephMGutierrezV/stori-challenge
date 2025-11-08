@@ -28,6 +28,7 @@ func TestLoadConfig_SuccessFromEnv(t *testing.T) {
 
 	t.Setenv("AWS_ENDPOINT_URL", "http://localstack:4566")
 	t.Setenv("AWS_S3_USE_PATH_STYLE", "true")
+	t.Setenv("STORI_LOGO_URL", "http://example.com/logo.png")
 
 	cfg, err := LoadConfig()
 	if err != nil {
@@ -73,6 +74,10 @@ func TestLoadConfig_SuccessFromEnv(t *testing.T) {
 	if cfg.UsePathStyle != true {
 		t.Errorf("UsePathStyle = %v, want true", cfg.UsePathStyle)
 	}
+
+	if cfg.StoriLogoURL != "http://example.com/logo.png" {
+		t.Errorf("StoriLogoURL = %q, want %q", cfg.StoriLogoURL, "http://example.com/logo.png")
+	}
 }
 
 func TestLoadConfig_MissingRequiredVariables(t *testing.T) {
@@ -86,6 +91,8 @@ func TestLoadConfig_MissingRequiredVariables(t *testing.T) {
 	t.Setenv("S3_REGION", "us-east-1")
 	t.Setenv("SES_FROM", "no-reply@stori-local.test")
 	t.Setenv("EMAIL_DEFAULT", "user@example.com")
+	t.Setenv("AWS_ENDPOINT_URL", "http://localstack:4566")
+	t.Setenv("STORI_LOGO_URL", "http://example.com/logo.png")
 
 	_, err := LoadConfig()
 	if err == nil {

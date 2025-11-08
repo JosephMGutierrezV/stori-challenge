@@ -2,6 +2,7 @@ package email
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"stori-challenge/internal/core/domain"
@@ -47,14 +48,14 @@ func TestBuildPlainBody_Format(t *testing.T) {
 	body := buildPlainBody(summary)
 
 	expected := "" +
-		"Total balance is 39.74\n" +
-		"Number of transactions in July: 2\n" +
-		"Number of transactions in August: 2\n" +
+		"Total balance: 39.74\n" +
+		"Transactions in July: 2\n" +
+		"Transactions in August: 2\n" +
 		"\n" +
-		"Average debit amount in July: -15.38\n" +
-		"Average credit amount in July: 35.25\n" +
-		"Average debit amount in August: -10.00\n" +
-		"Average credit amount in August: 10.00\n"
+		"Average debit in July: -15.38\n" +
+		"Average credit in July: 35.25\n" +
+		"Average debit in August: -10.00\n" +
+		"Average credit in August: 10.00\n"
 
 	if body != expected {
 		t.Fatalf("buildPlainBody() = \n%q\nwant\n%q", body, expected)
@@ -66,6 +67,7 @@ func TestSESEmailSender_SendSummaryEmail_BuildsCorrectRequest(t *testing.T) {
 	cfg := &config.Config{
 		SESFrom:      "no-reply@stori-local.test",
 		EmailDefault: "user@example.com",
+		StoriLogoURL: "https://static.stori.test/logo.png",
 	}
 
 	sender := NewSESEmailSender(fakeClient, cfg)
@@ -108,17 +110,37 @@ func TestSESEmailSender_SendSummaryEmail_BuildsCorrectRequest(t *testing.T) {
 		in.Content.Simple.Subject == nil || in.Content.Simple.Subject.Data == nil {
 		t.Fatalf("Content.Simple.Subject mal construido: %#v", in.Content)
 	}
-	if *in.Content.Simple.Subject.Data != "Stori - Resumen de movimientos" {
-		t.Errorf("Subject = %q, want %q", *in.Content.Simple.Subject.Data, "Stori - Resumen de movimientos")
+	if *in.Content.Simple.Subject.Data != "Stori - Account Summary" {
+		t.Errorf("Subject = %q, want %q", *in.Content.Simple.Subject.Data, "Stori - Account Summary")
 	}
 
-	if in.Content.Simple.Body == nil || in.Content.Simple.Body.Text == nil || in.Content.Simple.Body.Text.Data == nil {
+	if in.Content.Simple.Body == nil ||
+		in.Content.Simple.Body.Text == nil ||
+		in.Content.Simple.Body.Text.Data == nil {
 		t.Fatalf("Content.Simple.Body.Text mal construido: %#v", in.Content.Simple.Body)
 	}
 
-	expectedBody := buildPlainBody(summary)
-	if *in.Content.Simple.Body.Text.Data != expectedBody {
-		t.Errorf("Body text = %q, want %q", *in.Content.Simple.Body.Text.Data, expectedBody)
+	expectedText := buildPlainBody(summary)
+	if *in.Content.Simple.Body.Text.Data != expectedText {
+		t.Errorf("Body text = %q, want %q", *in.Content.Simple.Body.Text.Data, expectedText)
+	}
+
+	if in.Content.Simple.Body.Html == nil || in.Content.Simple.Body.Html.Data == nil {
+		t.Fatalf("Content.Simple.Body.Html debe estar presente al enviar HTML")
+	}
+
+	html := *in.Content.Simple.Body.Html.Data
+
+	if !strings.Contains(html, cfg.StoriLogoURL) {
+		t.Errorf("HTML body no contiene el logo URL %q", cfg.StoriLogoURL)
+	}
+
+	if !strings.Contains(html, "100.00") {
+		t.Errorf("HTML body no contiene el total balance formateado 100.00: %q", html)
+	}
+
+	if !strings.Contains(html, "2021-07") {
+		t.Errorf("HTML body no contiene el nombre del mes '2021-07': %q", html)
 	}
 }
 
