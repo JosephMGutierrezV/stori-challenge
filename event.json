@@ -1,0 +1,10 @@
+{
+  "Records": [
+    {
+      "s3": {
+        "bucket": { "name": "stori-transactions-local" },
+        "object": { "key": "input/txns.csv" }
+      }
+    }
+  ]
+}
