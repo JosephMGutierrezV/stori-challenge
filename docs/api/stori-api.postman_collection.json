@@ -1,0 +1,49 @@
+{
+	"info": {
+		"_postman_id": "0d4c2412-c0b2-419f-9d65-1e1f31fa034f",
+		"name": "stori-api",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "29180424"
+	},
+	"item": [
+		{
+			"name": "upload file",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "file",
+							"contentType": "text/csv",
+							"type": "file",
+							"src": "/D:/interview/stori-challenge/txns.csv"
+						}
+					]
+				},
+				"url": {
+					"raw": "https://9uue0y8wt6.execute-api.us-east-1.amazonaws.com/upload",
+					"protocol": "https",
+					"host": [
+						"9uue0y8wt6",
+						"execute-api",
+						"us-east-1",
+						"amazonaws",
+						"com"
+					],
+					"path": [
+						"upload"
+					]
+				},
+				"description": "Generated from cURL: curl -X POST \"https://9uue0y8wt6.execute-api.us-east-1.amazonaws.com/upload\" \\\r\n  -H \"Accept: application/json\" \\\r\n  -F \"file=@txns.csv;type=text/csv\""
+			},
+			"response": []
+		}
+	]
+}

@@ -1,0 +1,73 @@
+version: "3.9"
+
+services:
+  localstack:
+    image: localstack/localstack:4.5.0
+    container_name: localstack
+    ports:
+      - "4566:4566"
+      - "4510-4559:4510-4559"
+    environment:
+      - SERVICES=lambda,s3,ses,rds,secretsmanager,logs,cloudwatch,iam
+      - AWS_DEFAULT_REGION=us-east-1
+      - DEBUG=1
+      - PERSISTENCE=1
+    volumes:
+      - C:\docker-data\stori\localstack:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - devnet
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16
+    container_name: pg-local
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: app
+    ports:
+      - "5434:5432"
+    volumes:
+      - C:\docker-data\stori\postgres:/var/lib/postgresql/data
+    networks:
+      - devnet
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stori-app
+    depends_on:
+      - localstack
+      - postgres
+    environment:
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_S3_USE_PATH_STYLE: true
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: app
+      DB_PASSWORD: app
+      DB_NAME: app
+      DB_SCHEMA: public
+      S3_BUCKET_NAME: stori-transactions-local
+      S3_REGION: us-east-1
+      SES_FROM: "no-reply@stori-local.test"
+      EMAIL_DEFAULT: "josephmauricio23@hotmail.com"
+    volumes:
+      - ./:/src
+    networks:
+      - devnet
+    restart: unless-stopped
+    ports:
+      - "9001:8080"
+
+
+
+networks:
+  devnet:
+    driver: bridge
