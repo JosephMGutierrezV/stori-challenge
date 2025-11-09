@@ -562,10 +562,11 @@ Puedes entrar a YOPmail y revisar el resumen que genera la Lambda (HTML + texto 
 
 ---
 
-## Evidencia correo con imagen 
+##  📝 Evidencia correo con imagen 
 
 <img width="1630" height="934" alt="image" src="https://github.com/user-attachments/assets/38652a25-01df-4580-b503-d8b203f4c6fd" />
 
+---
 
 ## 🏁 Resumen rápido
 
