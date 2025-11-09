@@ -24,7 +24,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
       -o /out/main ./cmd/lambda_api/main.go
 
 
-FROM --platform=$TARGETPLATFORM public.ecr.aws/lambda/go:1
+FROM public.ecr.aws/lambda/go:1
 
 COPY --from=build /out/main ${LAMBDA_TASK_ROOT}/main
 

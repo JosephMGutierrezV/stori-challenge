@@ -1,149 +1,200 @@
 # 💳 Stori Challenge – Joseph Mauricio Gutiérrez Valero
 
-### 🧠 Descripción
+### 🧠 Descripción general
 
-Este proyecto fue desarrollado como solución al **Stori Software Engineer Technical Challenge**.  
-Procesa un archivo CSV con transacciones de crédito y débito, calcula el resumen mensual y envía un **correo electrónico con la información consolidada**.
+Este repositorio contiene la solución al **Stori Software Engineer Technical Challenge**.
 
-Está diseñado bajo **arquitectura hexagonal**, siguiendo **principios de TDD**, y preparado para ejecutarse tanto en **Docker** como en **AWS Lambda**.
+La Lambda principal:
+
+- Lee un archivo **CSV** con transacciones de crédito y débito desde **S3**.
+- Procesa las transacciones y calcula:
+    - Balance total de la cuenta.
+    - Número de transacciones agrupadas por mes.
+    - Promedio de montos de **créditos** y **débitos** agrupados por mes.
+- Persiste la información en **PostgreSQL**.
+- Envía un **correo electrónico** con el resumen, usando **SES**, con:
+    - Logo de Stori.
+    - Tabla de resumen mensual.
+
+El proyecto está diseñado con:
+
+- **Arquitectura hexagonal (ports & adapters)**.
+- Enfoque hacia **TDD** (tests de dominio, servicios y adaptadores).
+- Ejecución tanto en:
+    - Local con **Docker + docker-compose + LocalStack**.
+    - Infraestructura real en AWS usando **Terraform**.
+
+Además, existe una segunda Lambda (en otro repo) que, expuesta vía **API Gateway**, recibe un archivo, valida que sea un
+CSV correcto y lo sube al bucket S3 para que dispare esta Lambda de procesamiento.
 
 ---
 
-## 🏗️ Estructura del Proyecto
+## 🏗️ Estructura del proyecto
 
 ```text
-stori/
+📁 stori-challenge
 ├── cmd/
-│   ├── lambda_api/                 # Entrypoint para AWS Lambda (API Gateway)
-│   │   └── main.go
-│   └── local_runner/               # Entrypoint local (CLI o Docker)
-│
+│   └── lambda_api/
+│       └── main.go                # Entrypoint Lambda (S3Event → SummaryService)
 ├── configs/
-│   └── .env                        # Variables de entorno locales
-│
+│   └── .env                       # Configuración local (variables de entorno)
 ├── deployments/
-│   ├── docker/                     # Dockerfile y docker-compose.yml
-│   └── aws/                        # Template SAM o Terraform
-│
+│   └── terraform/                 # Infraestructura como código (AWS)
+│       ├── main.tf
+│       ├── variables.tf
+│       ├── outputs.tf
+│       └── terraform.tfvars
+├── docs/
+│   └── api/
+│       ├── README_API.md          # Documentación de la API (segunda Lambda)
+│       └── postman/
+│           └── stori-api.postman_collection.json  # Colección para API Gateway
 ├── internal/
-│   ├── core/                       # Dominio puro (entidades y reglas de negocio)
-│   │   ├── domain/                 # Entidades y objetos de valor
+│   ├── core/                      # Dominio puro + casos de uso
+│   │   ├── application/
+│   │   │   ├── summary_service.go
+│   │   │   └── summary_service_test.go
+│   │   ├── domain/
 │   │   │   ├── transaction.go
-│   │   │   ├── account.go
-│   │   │   └── errors.go
-│   │   ├── application/            # Casos de uso (servicios)
-│   │   │   └── summary_service.go
-│   │   └── ports/                  # Interfaces (puertos IN/OUT)
-│   │       ├── in/
-│   │       │   └── summary_port.go
-│   │       └── out/
-│   │           ├── email_sender.go
-│   │           └── transaction_repo.go
-│   │
-│   ├── interfaces/                 # Adaptadores (entrada/salida)
-│   │   ├── in/
-│   │   │   ├── lambdahandler/      # Adaptador para AWS Lambda
-│   │   │   └── cli/                # Adaptador CLI
-│   │   └── out/
-│   │       ├── csvreader/          # Lector de archivos CSV
-│   │       ├── email/              # Envío de correos (SMTP / SES)
-│   │       ├── persistence/        # Persistencia (ORM / DynamoDB / RDS)
-│   │       │   ├── rds/            # Adaptador GORM / PostgreSQL
-│   │       │   │   ├── mappers/    # Mapeo entre entidades y modelos GORM
-│   │       │   │   └── models/     # Modelos GORM con tags
-│   │       │   └── dynamo/         # (opcional) DynamoDB Adapter
-│   │       └── notifier/           # SNS / Email Notifications
-│   │
-│   ├── infra/                      # Configuración e infraestructura
-│   │   ├── aws/                    # Clientes AWS (S3, SES, DynamoDB)
-│   │   ├── bootstrap/              # Wiring de dependencias
-│   │   ├── config/                 # Carga de configuración (Viper)
-│   │   └── logger/                 # Logging centralizado
-│   │
-│   └── shared/                     # Utilidades puras (sin dependencias externas)
-│       └── uuid.go
-│
-├── test/                           # Tests unitarios y de integración
-│
-├── transactions.csv                # Archivo CSV de ejemplo
-│
+│   │   │   └── summary.go
+│   │   └── ports/
+│   │       └── in/
+│   │           └── summary_port.go
+│   ├── infra/                     # Infraestructura y cross-cutting concerns
+│   │   ├── aws/
+│   │   │   └── s3client/
+│   │   │       └── s3client.go
+│   │   ├── bootstrap/
+│   │   │   ├── bootstrap.go
+│   │   │   └── bootstrap_integration_test.go
+│   │   ├── config/
+│   │   │   ├── config.go
+│   │   │   └── config_test.go
+│   │   ├── database/
+│   │   │   └── postgres.go
+│   │   └── logger/
+│   │       └── logger.go
+│   └── interfaces/                # Adaptadores (S3, SES, RDS, etc.)
+│       ├── out/
+│       │   ├── csvreader/
+│       │   ├── email/
+│       │   └── rds/
+│       └── in/
+│           └── (futuros handlers API/CLI)
+├── migrations/
+│   ├── 0001_create_schema_transactions.up.sql
+│   ├── 0001_create_schema_transactions.down.sql
+│   ├── 0002_create_transactions_table.up.sql
+│   └── 0002_create_transactions_table.down.sql
 ├── .dockerignore
 ├── .gitignore
-├── Dockerfile                      # Construcción del contenedor
-├── docker-compose.yml              # Orquestación local con DB y app
-├── Makefile                        # Comandos automatizados (build, test, run)
-├── go.mod                          # Dependencias Go
-└── README.md                       # Documentación principal
+├── Dockerfile
+├── docker-compose.yml
+├── event.json                     # Ejemplo de evento S3 para pruebas locales
+├── txns.csv                       # Ejemplo de CSV de entrada
+├── go.mod
+├── go.sum
+├── Makefile
+└── README.md
 ```
 
 ---
 
-## ⚙️ Requisitos del Challenge
+## ⚙️ Requisitos del challenge
 
-| Requisito               | Descripción                                | Estado |
-|-------------------------|--------------------------------------------|--------|
-| 📊 **Procesar CSV**     | Lee transacciones de crédito y débito      | ✅      |
-| 💰 **Calcular resumen** | Balance total, totales por mes y promedios | ✅      |
-| 📧 **Enviar email**     | Envía resumen con formato y logo Stori     | ✅      |
-| 💾 **Guardar datos**    | Persistencia con GORM / PostgreSQL         | ✅      |
-| ☁️ **Cloud Ready**      | Compatible con AWS Lambda + SES + S3       | ✅      |
+| Requisito           | Descripción                                                        | Estado |
+|---------------------|--------------------------------------------------------------------|--------|
+| 📊 Procesar CSV     | Lee transacciones de crédito y débito desde un archivo CSV         | ✅      |
+| 💰 Calcular resumen | Balance total, resumen por mes y promedios de crédito/débito       | ✅      |
+| 📧 Enviar email     | Envía un correo con formato, tabla y logo de Stori vía SES         | ✅      |
+| 💾 Guardar datos    | Persiste transacciones y resumen usando GORM + PostgreSQL          | ✅      |
+| ☁️ Cloud Ready      | Compatible con AWS Lambda + S3 + SES + RDS (Terraform)             | ✅      |
+| 🧪 Pruebas          | Tests de dominio, servicio, adaptadores (incluidos de integración) | ✅      |
 
 ---
 
-## 🧩 Ejemplo de CSV de Entrada
+## 🧩 Ejemplo de CSV de entrada
+
+Formato esperado:
 
 ```csv
-date,transaction
-2021-07-15,+60.5
-2021-07-20,-20.46
-2021-08-10,+10.0
-2021-08-15,-10.3
+Id,Date,Transaction
+0,7/15,+60.5
+1,7/28,-10.3
+2,8/2,-20.46
+3,8/13,+10
+4,8/14,+15.75
+5,8/21,-5.25
+6,8/30,+120
+7,9/1,-40
+8,9/10,+5.5
+9,9/15,-12
 ```
+
+- `Id`: un identificador de la fila (no se usa en el cálculo del resumen, pero se valida la estructura).
+- `Date`: fecha en formato `M/D` (por ejemplo `7/15`).
+- `Transaction`: monto con signo `+` o `-`.
 
 ---
 
-## 📬 Ejemplo de Resumen Enviado
+## 📬 Ejemplo del resumen enviado por email
 
-```
-💳 Account Summary
+Versión **texto plano** (body de respaldo):
+
+```text
+Account Summary
 
 Total balance is 39.74
 
 Number of transactions in July: 2
 Number of transactions in August: 2
 
-Average debit amount: -15.38
-Average credit amount: 35.25
+Average debit amount in July: -15.38
+Average credit amount in July: 35.25
+Average debit amount in August: -10.00
+Average credit amount in August: 10.00
 ```
 
----
+La versión **HTML** incluye:
 
-## 🧰 Tecnologías Principales
-
-| Categoría       | Herramienta             |
-|-----------------|-------------------------|
-| Lenguaje        | Go (1.22)               |
-| ORM             | GORM                    |
-| Infraestructura | AWS Lambda, S3, SES     |
-| Configuración   | Viper                   |
-| Base de datos   | PostgreSQL              |
-| Testing         | Go `testing` + mocks    |
-| Contenedores    | Docker / docker-compose |
-| Build / CI      | Makefile                |
-| Estilo          | gofumpt + golangci-lint |
+- Logo de Stori (configurable por `STORI_LOGO_URL`).
+- Colores de marca (tonos verdes).
+- Tarjeta con:
+    - Balance total.
+    - Tabla con resumen por mes (`mes`, `# transacciones`, `avg debit`, `avg credit`).
+- Mensaje de aviso al usuario.
 
 ---
 
-# 🧪 Tutorial: Prueba Local con LocalStack
+## 🧰 Tecnologías principales
 
-Este tutorial muestra cómo levantar y probar el flujo completo del proyecto **Stori Challenge** localmente, sin usar recursos reales de AWS.  
-Podrás simular un evento S3, ejecutar la Lambda y verificar los resultados en una base de datos PostgreSQL.
+| Categoría       | Herramienta / Librería                     |
+|-----------------|--------------------------------------------|
+| Lenguaje        | Go 1.22                                    |
+| Arquitectura    | Hexagonal (ports & adapters)               |
+| ORM             | GORM                                       |
+| Base de datos   | PostgreSQL                                 |
+| Cloud           | AWS Lambda, S3, SES, RDS                   |
+| Infraestructura | Terraform                                  |
+| Configuración   | Viper                                      |
+| Logs            | Uber Zap                                   |
+| Testing         | Go `testing`, fakes y tests de integración |
+| Contenedores    | Docker, docker-compose                     |
+| Local Cloud     | LocalStack                                 |
+| Build / CI      | Makefile                                   |
+| Estilo Go       | gofumpt, golangci-lint                     |
 
 ---
 
-## 1. Crear el archivo `txns.csv`
+# 🧪 Tutorial: prueba local con Docker + LocalStack
 
-Crea un archivo llamado `txns.csv` en la raíz del proyecto con este contenido:
+Este tutorial te guía para probar el flujo completo **sin tocar AWS real**:
+
+`CSV → S3 (LocalStack) → Lambda (contenedor) → PostgreSQL`
+
+### 1. Crear el archivo `txns.csv`
+
+En la raíz del proyecto:
 
 ```csv
 Id,Date,Transaction
@@ -161,93 +212,95 @@ Id,Date,Transaction
 
 ---
 
-## 2. Levantar el entorno Docker
+### 2. Levantar el entorno con docker-compose
 
-El `docker-compose.yml` debe incluir los servicios:
+El `docker-compose.yml` levanta:
 
-- `localstack` (simula AWS)
-- `postgres` (base de datos local)
-- `stori-app` (tu Lambda como contenedor)
+- `localstack` → simula S3, SES (limitado), etc.
+- `pg-local` → PostgreSQL local.
+- `stori-app` → la imagen Lambda corriendo con `aws-lambda-runtime` en modo contenedor.
 
-Ejecuta:
+Desde la raíz del repo:
 
-```bash
+**Windows (PowerShell):**
+
+```powershell
+make compose-up
+# o
 docker compose up -d
 ```
 
-*(o `make compose-up` si tienes Makefile configurado)*
+**macOS / Linux:**
 
-Verifica los contenedores activos:
+```bash
+make compose-up
+# o
+docker compose up -d
+```
+
+Verifica los contenedores:
 
 ```bash
 docker ps
 ```
 
-Debes ver algo como:
-```
-localstack
-pg-local
-stori-app
-```
-
 ---
 
-## 3. Configurar AWS CLI para usar LocalStack
+### 3. Configurar AWS CLI para hablar con LocalStack
 
-No se necesitan recursos en la nube real.  
-Mientras uses `--endpoint-url http://localhost:4566`, todos los comandos apuntan a LocalStack.
+La clave: mientras uses `--endpoint-url http://localhost:4566`, todo va contra LocalStack.
 
 **Windows (PowerShell):**
+
 ```powershell
 $env:AWS_ACCESS_KEY_ID="test"
 $env:AWS_SECRET_ACCESS_KEY="test"
 $env:AWS_DEFAULT_REGION="us-east-1"
+
 function awslocal { aws --endpoint-url http://localhost:4566 @Args }
 ```
 
-**macOS / Linux:**
+**macOS / Linux (bash/zsh):**
+
 ```bash
 export AWS_ACCESS_KEY_ID=test
 export AWS_SECRET_ACCESS_KEY=test
 export AWS_DEFAULT_REGION=us-east-1
-alias awslocal='aws --endpoint-url http://localhost:4566'
+
+awslocal() {
+  aws --endpoint-url http://localhost:4566 "$@"
+}
 ```
 
 ---
 
-## 4. Crear el bucket S3 y subir el archivo
-
-Crea el bucket dentro de LocalStack:
+### 4. Crear el bucket S3 y subir el CSV
 
 ```bash
 awslocal s3 mb s3://stori-transactions-local
-```
 
-Sube el archivo:
-
-```bash
 awslocal s3 cp txns.csv s3://stori-transactions-local/input/txns.csv
-```
 
-Confirma que se subió correctamente:
-
-```bash
 awslocal s3 ls s3://stori-transactions-local/input/
 ```
 
+Si ves `txns.csv` listado, está todo bien.
+
 ---
 
-## 5. Crear el evento `event.json`
-
-Este archivo emula el evento que S3 enviaría a Lambda al subir el CSV.
+### 5. Crear el archivo `event.json`
 
 ```json
 {
   "Records": [
     {
       "s3": {
-        "bucket": { "name": "stori-transactions-local" },
-        "object": { "key": "input/txns.csv" }
+        "bucket": {
+          "name": "stori-transactions-local"
+        },
+        "object": {
+          "key": "input/txns.csv"
+        }
       }
     }
   ]
@@ -256,77 +309,267 @@ Este archivo emula el evento que S3 enviaría a Lambda al subir el CSV.
 
 ---
 
-## 6. Invocar la Lambda manualmente
+### 6. Invocar la Lambda localmente
 
-Si el contenedor de la Lambda expone `9001:8080`, ejecuta:
+El contenedor de la Lambda suele exponer `9001:8080`.
 
-```bash
+**Windows (PowerShell):**
+
+```powershell
 curl -Method Post "http://localhost:9001/2015-03-31/functions/function/invocations" `
   -ContentType "application/json" `
   -InFile "event.json"
 ```
 
-Esto simula la invocación automática que haría AWS cuando S3 genera un evento.
+**macOS / Linux:**
+
+```bash
+curl -X POST "http://localhost:9001/2015-03-31/functions/function/invocations" \
+  -H "Content-Type: application/json" \
+  -d @event.json
+```
+
+Esto simula el evento que dispara S3 en AWS.
 
 ---
 
-## 7. Ver logs de ejecución
-
-Consulta los logs para ver el flujo de procesamiento:
+### 7. Ver logs de la Lambda
 
 ```bash
 docker logs stori-app
 ```
 
-Deberías encontrar mensajes de:
-- Lectura del archivo desde S3
-- Procesamiento de las transacciones
-- Inserciones en la base de datos
-- Posible envío de email simulado (SES local)
+Ahí deberías ver:
+
+- El evento S3 recibido.
+- Lectura de `input/txns.csv` desde S3.
+- Cálculo del resumen.
+- Inserciones en DB.
+- Intento de envío de email:
+    - En AWS real: SES v2.
+    - En LocalStack: en este challenge se usa un **NoopEmailSender** cuando `AWS_ENDPOINT_URL` está configurado, para
+      evitar errores por cobertura parcial de SES.
 
 ---
 
-## 8. Validar en PostgreSQL
+### 8. Validar en PostgreSQL
 
-Conéctate al contenedor de Postgres (expuesto en `5434`):
+La DB local suele estar en `localhost:5434` (expuesta por docker-compose).
 
 ```bash
 psql "host=localhost port=5434 dbname=app user=app password=app"
 ```
 
-Ejecuta:
+Dentro de `psql`:
 
 ```sql
 \d
-SELECT * FROM transactions;
+SELECT *
+FROM transactions;
+SELECT *
+FROM account_summaries;
 ```
 
-Si ves los registros procesados, el flujo funciona correctamente.
+Si ves filas que coinciden con tu CSV, el flujo está funcionando.
 
 ---
 
-## 9. Limpiar el entorno
+### 9. Limpiar / resetear entorno
 
-Cuando quieras reiniciar todo:
+**Apagar contenedores:**
 
 ```bash
-docker compose down -v
+make compose-down
+# o
+docker compose down
 ```
 
-En Windows:
+**Reset total (contenedores + volúmenes + datos locales):**
 
-```powershell
-Remove-Item -Recurse -Force C:\docker-data\stori
+```bash
+make reset
+```
+
+En Windows esto también limpia `C:\docker-data\stori`.
+
+---
+
+## 🧪 Testing y TDD
+
+El proyecto trae varias capas de pruebas:
+
+- **Dominio (`internal/core/domain`)**
+    - Validación de estructuras y lógica básica.
+
+- **Casos de uso (`internal/core/application`)**
+    - Tests de `SummaryService`: cálculo de totales, agrupación por mes, promedio de débitos/créditos, interacción con
+      puertos (repositorio, lector de archivos, email).
+
+- **Adaptadores (`internal/interfaces/out`)**
+    - CSV reader S3.
+    - Repositorio RDS (GORM).
+    - Envío de email (SES + Noop).
+
+- **Infra / bootstrap**
+    - Tests de integración de wiring entre componentes.
+
+### Comandos de pruebas (Makefile)
+
+**Unitarias (dominio, servicios, adaptadores):**
+
+```bash
+make test
+```
+
+Internamente ejecuta:
+
+```bash
+go test ./internal/... -v -cover
+```
+
+**Integración (cuando estén configuradas en `./tests/integration/...`):**
+
+```bash
+make test-integration
+```
+
+Este target está preparado para leer el endpoint de la DB desde Terraform (`terraform output db_endpoint`) cuando la
+infraestructura está levantada.
+
+**Ejecutar todo:**
+
+```bash
+make test-all
 ```
 
 ---
 
-## 🏁 Resultado
+## ☁️ Infraestructura con Terraform (AWS real)
 
-Con este tutorial podrás reproducir localmente el flujo:
+En `deployments/terraform` se define la infraestructura necesaria en AWS:
 
+### Recursos principales
+
+- **VPC por defecto** (`data "aws_vpc" "default"`)
+- **RDS PostgreSQL**:
+    - `aws_db_instance.stori`
+    - Acceso público habilitado (solo para fines de demo).
+- **Bucket S3 de transacciones**:
+    - Versionado habilitado.
+- **Rol IAM para Lambda** con permisos para:
+    - Logs (CloudWatch).
+    - Lectura S3 (`AmazonS3ReadOnlyAccess`).
+    - SES (`AmazonSESFullAccess`).
+- **Lambda 1 – s3_processor**:
+    - `aws_lambda_function.s3_processor`
+    - `package_type = "Image"` → imagen en **ECR** (`var.ecr_s3_processor_image`).
+    - Variables de entorno para DB, S3, SES y logo Stori.
+    - Disparada por evento **S3 ObjectCreated .csv**.
+- **Lambda 2 – api_handler** (en otro repo, pero orquestada desde aquí):
+    - `aws_lambda_function.api_handler`
+    - También basada en imagen ECR (`var.ecr_api_handler_image`).
+    - Expuesta vía **API Gateway HTTP API**.
+- **API Gateway v2**:
+    - `aws_apigatewayv2_api.http_api`
+    - Integración proxy con `api_handler`.
+    - Stage `$default` con `auto_deploy = true`.
+
+### Comandos Terraform vía Makefile
+
+Todos se ejecutan desde la raíz del repo:
+
+**Inicializar Terraform:**
+
+```bash
+make tf-init
 ```
-CSV -> S3 (LocalStack) -> Lambda (contenedor) -> PostgreSQL (como RDS)
+
+**Ver plan de cambios:**
+
+```bash
+make tf-plan
 ```
 
-Sin tocar recursos reales de AWS. Ideal para pruebas de integración o desarrollo sin costo.
+**Aplicar infraestructura (crear / actualizar):**
+
+```bash
+make tf-apply
+```
+
+**Destruir infraestructura (limpieza):**
+
+```bash
+make tf-destroy
+```
+
+Atajos:
+
+```bash
+make infra-up    # equivale a tf-init + tf-apply
+make infra-down  # equivale a tf-destroy
+```
+
+> ⚠️ Nota: el `provider "aws"` usa `profile = "personal"` en `main.tf`.  
+> Si tienes varios perfiles en tu AWS CLI, asegúrate de que `personal` apunte a la cuenta correcta.
+
+---
+
+## 🧪 Flujo end-to-end en AWS
+
+Combinando todo:
+
+1. Se despliega la infraestructura con **Terraform** (`make infra-up`).
+2. Se publica la imagen de la Lambda en **ECR** (`make login && make publish`).
+3. Terraform apunta la Lambda a esas imágenes (`ecr_s3_processor_image` y `ecr_api_handler_image`).
+4. Llegan peticiones al **API Gateway** hacia la segunda Lambda que:
+    - Valida el archivo subido (CSV no vacío, estructura correcta).
+    - Lo sube al bucket S3.
+5. El evento `ObjectCreated` dispara la Lambda `s3_processor`, que:
+    - Lee el CSV.
+    - Calcula el resumen.
+    - Persiste en RDS.
+    - Envía el correo con el resumen usando SES.
+
+Para probar el API Gateway sin tocar código, puedes usar la colección de **Postman** en:
+
+```text
+docs/api/postman/stori-api.postman_collection.json
+```
+
+---
+
+## 📬 Revisión de la prueba (entorno desplegado)
+
+Durante el periodo de evaluación de esta prueba técnica:
+
+- La solución estará desplegada en mi cuenta personal de AWS (perfil `personal`).
+- Puedes usar la colección de Postman incluida en `docs/api/postman` para disparar el API Gateway.
+- El correo de resumen se envía a un correo temporal:
+
+```text
+joseph-stori@yopmail.com
+```
+
+Puedes entrar a YOPmail y revisar el resumen que genera la Lambda (HTML + texto plano).
+
+---
+
+## 🧑‍💻 Autor
+
+**Joseph Mauricio Gutiérrez Valero**  
+💼 Backend / Go / AWS / Arquitectura Hexagonal  
+📧 josephmauricio23@hotmail.com
+
+---
+
+## 🏁 Resumen rápido
+
+- ✅ Arquitectura hexagonal real (dominio aislado, ports & adapters).
+- ✅ Lambda que procesa CSV desde S3, persiste en RDS y envía correo vía SES.
+- ✅ Infraestructura reproducible con Terraform.
+- ✅ Ejecutable localmente con Docker + LocalStack.
+- ✅ Tests unitarios y de integración.
+- ✅ Colección de Postman para probar el flujo vía API Gateway.
+
+Si quieres entender el sistema a vista de pájaro:  
+**"Subo un CSV → aparece en S3 → Lambda lo procesa → guarda en DB → manda un correo bonito con el resumen."**

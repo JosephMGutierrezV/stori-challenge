@@ -8,3 +8,13 @@ Dockerfile
 vendor/
 bin/
 tmp/
+*_test.go
+*.out
+*.exe
+*.swp
+.env.local
+.env.development
+coverage*
+*.cover
+.idea/
+.vscode/
