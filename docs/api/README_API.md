@@ -33,5 +33,11 @@ Id,Date,Transaction
 
 ---
 
+## 🔗 Código fuente
+
+[Repositorio en GitHub](https://github.com/JosephMGutierrezV/stori-api)
+
+---
+
 **Autor:** Joseph Gutiérrez  
 **Propósito:** Validar conexión funcional API Gateway → Lambda → S3.
