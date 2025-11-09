@@ -11,12 +11,13 @@ import (
 
 func NewPostgresDB(cfg *config.Config) (*gorm.DB, error) {
 	dsn := fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable search_path=%s",
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s search_path=%s",
 		cfg.DBHost,
 		cfg.DBUser,
 		cfg.DBPassword,
 		cfg.DBName,
 		cfg.DBPort,
+		cfg.DBSSLMode,
 		cfg.DBSchema,
 	)
 
@@ -24,6 +25,6 @@ func NewPostgresDB(cfg *config.Config) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return db, nil
 }

@@ -18,3 +18,11 @@ coverage*
 *.cover
 .idea/
 .vscode/
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+terraform.tfvars
+*.tfplan
+.terraform.lock.hcl

@@ -10,8 +10,8 @@ terraform {
 }
 
 provider "aws" {
-  region = var.aws_region
-  profile = "personal"
+  region  = var.aws_region
+  profile = var.aws_profile
 }
 
 data "aws_vpc" "default" {
@@ -64,8 +64,7 @@ resource "aws_db_subnet_group" "stori" {
 resource "aws_db_instance" "stori" {
   identifier        = "stori-db"
   engine            = "postgres"
-  engine_version    = "16.2"
-  instance_class    = "db.t4g.micro"
+  instance_class    = "db.t3.micro"
   allocated_storage = 20
 
   username = var.db_username
@@ -75,8 +74,16 @@ resource "aws_db_instance" "stori" {
 
   publicly_accessible    = true
   skip_final_snapshot    = true
+  deletion_protection    = false
   vpc_security_group_ids = [aws_security_group.rds.id]
   db_subnet_group_name   = aws_db_subnet_group.stori.name
+
+  storage_type = "gp2"
+
+  tags = {
+    Name        = "stori-db-dev"
+    Environment = "development"
+  }
 }
 
 resource "aws_iam_role" "lambda_exec" {
@@ -101,7 +108,7 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
 
 resource "aws_iam_role_policy_attachment" "lambda_s3" {
   role       = aws_iam_role.lambda_exec.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess"
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_ses" {
@@ -125,6 +132,7 @@ resource "aws_lambda_function" "s3_processor" {
       DB_PASSWORD = var.db_password
       DB_NAME     = var.db_name
       DB_SCHEMA   = "public"
+      DB_SSL_MODE = "require"
 
       S3_BUCKET_NAME = aws_s3_bucket.transactions.bucket
       S3_REGION      = var.aws_region
@@ -155,6 +163,7 @@ resource "aws_lambda_function" "api_handler" {
       DB_PASSWORD = var.db_password
       DB_NAME     = var.db_name
       DB_SCHEMA   = "public"
+      DB_SSL_MODE = "require"
 
       S3_BUCKET_NAME = aws_s3_bucket.transactions.bucket
       S3_REGION      = var.aws_region
@@ -192,6 +201,21 @@ resource "aws_s3_bucket_notification" "s3_to_lambda" {
 resource "aws_apigatewayv2_api" "http_api" {
   name          = "stori-http-api"
   protocol_type = "HTTP"
+
+  cors_configuration {
+    allow_origins = ["*"]
+    allow_methods = ["OPTIONS", "POST"]
+    allow_headers = ["content-type", "authorization"]
+    expose_headers = [
+      "content-type",
+      "x-request-id",
+    ]
+    max_age = 3600
+  }
+
+  body = jsonencode({
+    binaryMediaTypes = ["multipart/form-data"]
+  })
 }
 
 resource "aws_apigatewayv2_integration" "lambda_integration" {
@@ -200,11 +224,12 @@ resource "aws_apigatewayv2_integration" "lambda_integration" {
   integration_uri        = aws_lambda_function.api_handler.invoke_arn
   integration_method     = "POST"
   payload_format_version = "2.0"
+  timeout_milliseconds   = 29000
 }
 
-resource "aws_apigatewayv2_route" "default_route" {
+resource "aws_apigatewayv2_route" "upload_route" {
   api_id    = aws_apigatewayv2_api.http_api.id
-  route_key = "ANY /"
+  route_key = "POST /upload"
   target    = "integrations/${aws_apigatewayv2_integration.lambda_integration.id}"
 }
 
@@ -221,3 +246,4 @@ resource "aws_lambda_permission" "allow_apigw_invoke" {
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.http_api.execution_arn}/*/*"
 }
+

@@ -4,6 +4,12 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "aws_profile" {
+  type        = string
+  description = "AWS CLI profile to use for this deployment"
+  default     = "personal"
+}
+
 variable "s3_bucket_name" {
   description = "Globally unique S3 bucket name for transaction CSVs"
   type        = string

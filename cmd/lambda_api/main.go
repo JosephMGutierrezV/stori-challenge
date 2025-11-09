@@ -29,6 +29,7 @@ func init() {
 		zap.String("db_name", cfg.DBName),
 		zap.String("s3_bucket", cfg.S3BucketName),
 		zap.String("s3_region", cfg.S3Region),
+		zap.String("ssl_mode", cfg.DBSSLMode),
 	)
 
 	appCtx, err = bootstrap.InitializeApp(cfg)
