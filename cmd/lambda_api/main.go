@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 var appCtx *bootstrap.AppContext
@@ -38,32 +39,55 @@ func init() {
 	}
 }
 
+func processS3Record(ctx context.Context, rec events.S3EventRecord) error {
+	bucket := rec.S3.Bucket.Name
+	key := rec.S3.Object.Key
+
+	logger.Logger.Info("procesando objeto S3",
+		zap.String("bucket", bucket),
+		zap.String("key", key),
+	)
+
+	if err := appCtx.SummaryUseCase.ProcessTransactionsFromObject(ctx, bucket, key); err != nil {
+		logger.Logger.Error("error procesando transacciones",
+			zap.String("bucket", bucket),
+			zap.String("key", key),
+			zap.Error(err),
+		)
+		return err
+	}
+	return nil
+}
+
 func handler(ctx context.Context, evt events.S3Event) error {
 	logger.Logger.Info("evento S3 recibido",
 		zap.Int("records", len(evt.Records)),
 	)
 
-	for _, rec := range evt.Records {
-		bucket := rec.S3.Bucket.Name
-		key := rec.S3.Object.Key
-
-		logger.Logger.Info("procesando objeto S3",
-			zap.String("bucket", bucket),
-			zap.String("key", key),
-		)
-
-		if err := appCtx.SummaryUseCase.
-			ProcessTransactionsFromObject(ctx, bucket, key); err != nil {
-			logger.Logger.Error("error procesando transacciones",
-				zap.String("bucket", bucket),
-				zap.String("key", key),
-				zap.Error(err),
-			)
+	if len(evt.Records) == 1 {
+		if err := processS3Record(ctx, evt.Records[0]); err != nil {
 			return err
 		}
+		logger.Logger.Info("evento S3 procesado correctamente")
+		return nil
 	}
 
-	logger.Logger.Info("evento S3 procesado correctamente")
+	g, ctx := errgroup.WithContext(ctx)
+	g.SetLimit(4)
+
+	for _, rec := range evt.Records {
+		r := rec
+		g.Go(func() error {
+			return processS3Record(ctx, r)
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		logger.Logger.Error("falló al menos un procesamiento de objeto S3", zap.Error(err))
+		return err
+	}
+
+	logger.Logger.Info("evento S3 procesado correctamente (procesamiento concurrente)")
 	return nil
 }
 
