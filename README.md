@@ -170,7 +170,7 @@ La versión **HTML** incluye:
 
 | Categoría       | Herramienta / Librería                     |
 |-----------------|--------------------------------------------|
-| Lenguaje        | Go 1.22                                    |
+| Lenguaje        | Go 1.22+                                   |
 | Arquitectura    | Hexagonal (ports & adapters)               |
 | ORM             | GORM                                       |
 | Base de datos   | PostgreSQL                                 |
@@ -550,7 +550,7 @@ Durante el periodo de evaluación de esta prueba técnica:
 joseph-stori@yopmail.com
 ```
 
-Puedes entrar a YOPmail y revisar el resumen que genera la Lambda (HTML + texto plano).
+Puedes [abrir Yopmail](https://yopmail.com/es/) y revisar el resumen que genera la Lambda (HTML + texto plano).
 
 ---
 
