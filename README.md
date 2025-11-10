@@ -192,6 +192,8 @@ Este tutorial te guía para probar el flujo completo **sin tocar AWS real**:
 
 `CSV → S3 (LocalStack) → Lambda (contenedor) → PostgreSQL`
 
+> ⚠️ Nota: Se debe tener instalado y configurado aws cli
+
 ### 1. Crear el archivo `txns.csv`
 
 En la raíz del proyecto:
