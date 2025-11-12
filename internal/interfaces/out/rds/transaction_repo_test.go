@@ -10,8 +10,13 @@ import (
 	"stori-challenge/internal/interfaces/out/rds/models"
 
 	"github.com/glebarez/sqlite"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
+
+func dec(s string) decimal.Decimal {
+	return decimal.RequireFromString(s)
+}
 
 func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -85,8 +90,8 @@ func TestTransactionRepo_SaveTransactions_InsertsRecords(t *testing.T) {
 	now := time.Date(2021, 7, 15, 0, 0, 0, 0, time.UTC)
 
 	txs := []domain.Transaction{
-		{Date: now, Amount: 100.5},
-		{Date: now.AddDate(0, 0, 1), Amount: -40.25},
+		{Date: now, Amount: dec("100.50")},
+		{Date: now.AddDate(0, 0, 1), Amount: dec("-40.25")},
 	}
 
 	if err := repo.SaveTransactions(ctx, bucket, key, txs); err != nil {
@@ -112,7 +117,7 @@ func TestTransactionRepo_SaveTransactions_InsertsRecords(t *testing.T) {
 		if !rec.Date.Equal(txs[i].Date) {
 			t.Errorf("record %d Date = %v, want %v", i, rec.Date, txs[i].Date)
 		}
-		if rec.Amount != txs[i].Amount {
+		if !rec.Amount.Equal(txs[i].Amount) {
 			t.Errorf("record %d Amount = %v, want %v", i, rec.Amount, txs[i].Amount)
 		}
 	}
@@ -127,19 +132,19 @@ func TestTransactionRepo_SaveSummary_InsertsSummary(t *testing.T) {
 	key := "input/txns.csv"
 
 	summary := domain.AccountSummary{
-		TotalBalance: 110.25,
+		TotalBalance: dec("110.25"),
 		ByMonth: []domain.MonthlySummary{
 			{
 				MonthName:           "2021-07",
 				TransactionsCount:   3,
-				AverageDebitAmount:  -20.10,
-				AverageCreditAmount: 50.20,
+				AverageDebitAmount:  dec("-20.10"),
+				AverageCreditAmount: dec("50.20"),
 			},
 			{
 				MonthName:           "2021-08",
 				TransactionsCount:   1,
-				AverageDebitAmount:  0,
-				AverageCreditAmount: 30.05,
+				AverageDebitAmount:  dec("0.00"),
+				AverageCreditAmount: dec("30.05"),
 			},
 		},
 	}
@@ -165,7 +170,7 @@ func TestTransactionRepo_SaveSummary_InsertsSummary(t *testing.T) {
 	if rec.ObjectKey != key {
 		t.Errorf("ObjectKey = %q, want %q", rec.ObjectKey, key)
 	}
-	if rec.TotalBalance != summary.TotalBalance {
+	if !rec.TotalBalance.Equal(summary.TotalBalance) {
 		t.Errorf("TotalBalance = %v, want %v", rec.TotalBalance, summary.TotalBalance)
 	}
 
@@ -176,5 +181,21 @@ func TestTransactionRepo_SaveSummary_InsertsSummary(t *testing.T) {
 
 	if len(decoded) != len(summary.ByMonth) {
 		t.Fatalf("len(decoded ByMonth) = %d, want %d", len(decoded), len(summary.ByMonth))
+	}
+
+	for i, d := range decoded {
+		want := summary.ByMonth[i]
+		if d.MonthName != want.MonthName {
+			t.Errorf("MonthName[%d] = %q, want %q", i, d.MonthName, want.MonthName)
+		}
+		if d.TransactionsCount != want.TransactionsCount {
+			t.Errorf("TransactionsCount[%d] = %d, want %d", i, d.TransactionsCount, want.TransactionsCount)
+		}
+		if !d.AverageDebitAmount.Equal(want.AverageDebitAmount) {
+			t.Errorf("AverageDebitAmount[%d] = %v, want %v", i, d.AverageDebitAmount, want.AverageDebitAmount)
+		}
+		if !d.AverageCreditAmount.Equal(want.AverageCreditAmount) {
+			t.Errorf("AverageCreditAmount[%d] = %v, want %v", i, d.AverageCreditAmount, want.AverageCreditAmount)
+		}
 	}
 }

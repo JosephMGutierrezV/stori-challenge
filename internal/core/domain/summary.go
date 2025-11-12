@@ -1,13 +1,15 @@
 package domain
 
+import "github.com/shopspring/decimal"
+
 type MonthlySummary struct {
 	MonthName           string
 	TransactionsCount   int
-	AverageDebitAmount  float64
-	AverageCreditAmount float64
+	AverageDebitAmount  decimal.Decimal
+	AverageCreditAmount decimal.Decimal
 }
 
 type AccountSummary struct {
-	TotalBalance float64
+	TotalBalance decimal.Decimal
 	ByMonth      []MonthlySummary
 }

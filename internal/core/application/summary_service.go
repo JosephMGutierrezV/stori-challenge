@@ -5,8 +5,9 @@ import (
 	"stori-challenge/internal/core/domain"
 	portin "stori-challenge/internal/core/ports/in"
 	"stori-challenge/internal/core/ports/out"
-
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 var _ portin.SummaryUseCase = (*SummaryService)(nil)
@@ -34,7 +35,7 @@ func (s *SummaryService) ProcessTransactionsFromObject(
 	bucket string,
 	key string,
 ) error {
-	transactions, err := s.txReader.ReadTransactionsFromObject(ctx, bucket, key)
+	transactions, err := s.txReader.ReadTransactionsFromObjectParallel(ctx, bucket, key)
 	if err != nil {
 		return err
 	}
@@ -56,16 +57,16 @@ func (s *SummaryService) ProcessTransactionsFromObject(
 }
 
 func buildAccountSummary(txs []domain.Transaction) domain.AccountSummary {
-	var total float64
+	var total decimal.Decimal
 	for _, tx := range txs {
-		total += tx.Amount
+		total = total.Add(tx.Amount)
 	}
 
 	type acc struct {
 		count       int
-		sumDebit    float64
+		sumDebit    decimal.Decimal
 		countDebit  int
-		sumCredit   float64
+		sumCredit   decimal.Decimal
 		countCredit int
 	}
 
@@ -79,11 +80,11 @@ func buildAccountSummary(txs []domain.Transaction) domain.AccountSummary {
 		a := byMonthAcc[m]
 		a.count++
 
-		if tx.Amount < 0 {
-			a.sumDebit += tx.Amount
+		if tx.Amount.LessThan(decimal.Zero) {
+			a.sumDebit = a.sumDebit.Add(tx.Amount)
 			a.countDebit++
 		} else {
-			a.sumCredit += tx.Amount
+			a.sumCredit = a.sumCredit.Add(tx.Amount)
 			a.countCredit++
 		}
 	}
@@ -95,10 +96,10 @@ func buildAccountSummary(txs []domain.Transaction) domain.AccountSummary {
 			TransactionsCount: a.count,
 		}
 		if a.countDebit > 0 {
-			ms.AverageDebitAmount = a.sumDebit / float64(a.countDebit)
+			ms.AverageDebitAmount = a.sumDebit.Div(decimal.NewFromInt(int64(a.countDebit)))
 		}
 		if a.countCredit > 0 {
-			ms.AverageCreditAmount = a.sumCredit / float64(a.countCredit)
+			ms.AverageCreditAmount = a.sumCredit.Div(decimal.NewFromInt(int64(a.countCredit)))
 		}
 		byMonth = append(byMonth, ms)
 	}

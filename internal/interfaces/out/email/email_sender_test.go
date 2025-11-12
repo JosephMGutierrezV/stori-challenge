@@ -1,3 +1,4 @@
+// internal/interfaces/out/email/email_sender_test.go
 package email
 
 import (
@@ -10,7 +11,12 @@ import (
 	"stori-challenge/internal/infra/logger"
 
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
+	"github.com/shopspring/decimal"
 )
+
+func dec(s string) decimal.Decimal {
+	return decimal.RequireFromString(s)
+}
 
 type fakeSESClient struct {
 	lastInput *sesv2.SendEmailInput
@@ -26,21 +32,28 @@ func (f *fakeSESClient) SendEmail(
 	return &sesv2.SendEmailOutput{}, f.retErr
 }
 
+func valOrNil(s *string) string {
+	if s == nil {
+		return "<nil>"
+	}
+	return *s
+}
+
 func TestBuildPlainBody_Format(t *testing.T) {
 	summary := domain.AccountSummary{
-		TotalBalance: 39.74,
+		TotalBalance: dec("39.74"),
 		ByMonth: []domain.MonthlySummary{
 			{
 				MonthName:           "July",
 				TransactionsCount:   2,
-				AverageDebitAmount:  -15.38,
-				AverageCreditAmount: 35.25,
+				AverageDebitAmount:  dec("-15.38"),
+				AverageCreditAmount: dec("35.25"),
 			},
 			{
 				MonthName:           "August",
 				TransactionsCount:   2,
-				AverageDebitAmount:  -10.00,
-				AverageCreditAmount: 10.00,
+				AverageDebitAmount:  dec("-10.00"),
+				AverageCreditAmount: dec("10.00"),
 			},
 		},
 	}
@@ -73,13 +86,13 @@ func TestSESEmailSender_SendSummaryEmail_BuildsCorrectRequest(t *testing.T) {
 	sender := NewSESEmailSender(fakeClient, cfg)
 
 	summary := domain.AccountSummary{
-		TotalBalance: 100.00,
+		TotalBalance: dec("100.00"),
 		ByMonth: []domain.MonthlySummary{
 			{
 				MonthName:           "2021-07",
 				TransactionsCount:   1,
-				AverageDebitAmount:  -10.00,
-				AverageCreditAmount: 110.00,
+				AverageDebitAmount:  dec("-10.00"),
+				AverageCreditAmount: dec("110.00"),
 			},
 		},
 	}
@@ -135,20 +148,17 @@ func TestSESEmailSender_SendSummaryEmail_BuildsCorrectRequest(t *testing.T) {
 		t.Errorf("HTML body no contiene el logo URL %q", cfg.StoriLogoURL)
 	}
 
-	if !strings.Contains(html, "100.00") {
-		t.Errorf("HTML body no contiene el total balance formateado 100.00: %q", html)
+	if !strings.Contains(html, "100.00 MXN") {
+		t.Errorf("HTML body no contiene el total balance formateado 100.00 MXN: %q", html)
 	}
 
 	if !strings.Contains(html, "2021-07") {
 		t.Errorf("HTML body no contiene el nombre del mes '2021-07': %q", html)
 	}
-}
 
-func valOrNil(s *string) string {
-	if s == nil {
-		return "<nil>"
+	if !strings.Contains(html, "-10.00") || !strings.Contains(html, "110.00") {
+		t.Errorf("HTML body no contiene promedios formateados: %q", html)
 	}
-	return *s
 }
 
 func TestNoopEmailSender_SendSummaryEmail_NoError(t *testing.T) {
@@ -164,13 +174,13 @@ func TestNoopEmailSender_SendSummaryEmail_NoError(t *testing.T) {
 	sender := NewNoopEmailSender(cfg)
 
 	summary := domain.AccountSummary{
-		TotalBalance: 10,
+		TotalBalance: dec("10"),
 		ByMonth: []domain.MonthlySummary{
 			{
 				MonthName:           "2021-07",
 				TransactionsCount:   1,
-				AverageDebitAmount:  -5,
-				AverageCreditAmount: 15,
+				AverageDebitAmount:  dec("-5"),
+				AverageCreditAmount: dec("15"),
 			},
 		},
 	}

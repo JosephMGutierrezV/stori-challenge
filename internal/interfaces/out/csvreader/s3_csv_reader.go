@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/csv"
 	"io"
-	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"stori-challenge/internal/core/domain"
 	"stori-challenge/internal/core/ports/out"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/shopspring/decimal"
 )
 
 type s3GetObjectAPI interface {
@@ -86,7 +87,7 @@ func (r *S3CSVReader) ReadTransactionsFromObject(
 
 		d := time.Date(2021, dMD.Month(), dMD.Day(), 0, 0, 0, 0, time.UTC)
 
-		amount, err := strconv.ParseFloat(amountStr, 64)
+		amount, err := decimal.NewFromString(amountStr)
 		if err != nil {
 			return nil, err
 		}
@@ -122,7 +123,6 @@ func (r *S3CSVReader) ReadTransactionsFromObjectParallel(
 	if err != nil {
 		return nil, err
 	}
-
 	if len(header) < 3 ||
 		!strings.EqualFold(header[0], "Id") ||
 		!strings.EqualFold(header[1], "Date") {
@@ -132,18 +132,28 @@ func (r *S3CSVReader) ReadTransactionsFromObjectParallel(
 	records := make(chan []string)
 	results := make(chan domain.Transaction)
 	errs := make(chan error, 1)
-	done := make(chan struct{})
 
 	const workerCount = 5
+	var wg sync.WaitGroup
+	wg.Add(workerCount)
+
 	for i := 0; i < workerCount; i++ {
 		go func() {
+			defer wg.Done()
 			for record := range records {
 				tx, err := parseRecord(record)
 				if err != nil {
-					errs <- err
+					select {
+					case errs <- err:
+					default:
+					}
 					return
 				}
-				results <- tx
+				select {
+				case results <- tx:
+				case <-ctx.Done():
+					return
+				}
 			}
 		}()
 	}
@@ -156,32 +166,41 @@ func (r *S3CSVReader) ReadTransactionsFromObjectParallel(
 				return
 			}
 			if err != nil {
-				errs <- err
+				select {
+				case errs <- err:
+				default:
+				}
 				return
 			}
 			if len(record) < 3 {
 				continue
 			}
-			records <- record
+			select {
+			case records <- record:
+			case <-ctx.Done():
+				return
+			}
 		}
+	}()
+
+	go func() {
+		wg.Wait()
+		close(results)
 	}()
 
 	var txs []domain.Transaction
-
-	go func() {
-		for tx := range results {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case err := <-errs:
+			return nil, err
+		case tx, ok := <-results:
+			if !ok {
+				return txs, nil
+			}
 			txs = append(txs, tx)
 		}
-		close(done)
-	}()
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case err := <-errs:
-		return nil, err
-	case <-done:
-		return txs, nil
 	}
 }
 
@@ -196,7 +215,7 @@ func parseRecord(record []string) (domain.Transaction, error) {
 
 	d := time.Date(2021, dMD.Month(), dMD.Day(), 0, 0, 0, 0, time.UTC)
 
-	amount, err := strconv.ParseFloat(amountStr, 64)
+	amount, err := decimal.NewFromString(amountStr)
 	if err != nil {
 		return domain.Transaction{}, err
 	}

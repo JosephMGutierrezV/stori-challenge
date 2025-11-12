@@ -9,6 +9,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.89.2
 	github.com/aws/aws-sdk-go-v2/service/sesv2 v1.54.2
 	github.com/glebarez/sqlite v1.11.0
+	github.com/shopspring/decimal v1.4.0
 	github.com/spf13/viper v1.21.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/sync v0.16.0

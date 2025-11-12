@@ -1,12 +1,16 @@
 package models
 
-import "time"
+import (
+	"time"
+
+	"github.com/shopspring/decimal"
+)
 
 type AccountSummary struct {
 	ID           uint   `gorm:"primaryKey"`
 	Bucket       string `gorm:"size:255;index"`
 	ObjectKey    string `gorm:"size:512;index"`
-	TotalBalance float64
+	TotalBalance decimal.Decimal
 
 	RawSummary string `gorm:"type:text"`
 

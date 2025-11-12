@@ -11,6 +11,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/service/sesv2"
 	"github.com/aws/aws-sdk-go-v2/service/sesv2/types"
+	"github.com/shopspring/decimal"
 )
 
 const (
@@ -57,16 +58,22 @@ func (s *SESEmailSender) SendSummaryEmail(ctx context.Context, summary domain.Ac
 	return err
 }
 
+func money(d decimal.Decimal) string {
+	return d.StringFixed(2)
+}
+
 func buildPlainBody(summary domain.AccountSummary) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "Total balance: %.2f\n", summary.TotalBalance)
+	fmt.Fprintf(&b, "Total balance: %s\n", money(summary.TotalBalance))
+
 	for _, m := range summary.ByMonth {
 		fmt.Fprintf(&b, "Transactions in %s: %d\n", m.MonthName, m.TransactionsCount)
 	}
+
 	b.WriteString("\n")
 	for _, m := range summary.ByMonth {
-		fmt.Fprintf(&b, "Average debit in %s: %.2f\n", m.MonthName, m.AverageDebitAmount)
-		fmt.Fprintf(&b, "Average credit in %s: %.2f\n", m.MonthName, m.AverageCreditAmount)
+		fmt.Fprintf(&b, "Average debit in %s: %s\n", m.MonthName, money(m.AverageDebitAmount))
+		fmt.Fprintf(&b, "Average credit in %s: %s\n", m.MonthName, money(m.AverageCreditAmount))
 	}
 	return b.String()
 }
@@ -110,7 +117,7 @@ func buildHTMLBody(summary domain.AccountSummary, logoURL string) string {
                 </p>
                 <p style="margin:0;font-size:26px;font-weight:700;color:` + storiDarkGreen + `;">
 `)
-	fmt.Fprintf(&b, "                  %.2f MXN\n", summary.TotalBalance)
+	fmt.Fprintf(&b, "                  %s MXN\n", money(summary.TotalBalance))
 	b.WriteString(`                </p>
               </td>
             </tr>
@@ -136,8 +143,8 @@ func buildHTMLBody(summary domain.AccountSummary, logoURL string) string {
 		b.WriteString("                    <tr>\n")
 		fmt.Fprintf(&b, "                      <td style=\"padding:8px 10px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;\">%s</td>\n", m.MonthName)
 		fmt.Fprintf(&b, "                      <td align=\"right\" style=\"padding:8px 10px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;\">%d</td>\n", m.TransactionsCount)
-		fmt.Fprintf(&b, "                      <td align=\"right\" style=\"padding:8px 10px;font-size:13px;color:#d32f2f;border-bottom:1px solid #f3f4f6;\">%.2f</td>\n", m.AverageDebitAmount)
-		fmt.Fprintf(&b, "                      <td align=\"right\" style=\"padding:8px 10px;font-size:13px;color:#2e7d32;border-bottom:1px solid #f3f4f6;\">%.2f</td>\n", m.AverageCreditAmount)
+		fmt.Fprintf(&b, "                      <td align=\"right\" style=\"padding:8px 10px;font-size:13px;color:#d32f2f;border-bottom:1px solid #f3f4f6;\">%s</td>\n", money(m.AverageDebitAmount))
+		fmt.Fprintf(&b, "                      <td align=\"right\" style=\"padding:8px 10px;font-size:13px;color:#2e7d32;border-bottom:1px solid #f3f4f6;\">%s</td>\n", money(m.AverageCreditAmount))
 		b.WriteString("                    </tr>\n")
 	}
 
